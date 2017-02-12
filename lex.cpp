@@ -3,20 +3,6 @@
 #include <cctype>
 #include "lex.h"
 
-std::string
-Token::toString() {
-	switch (type) {
-		case TOK_INT:
-			return std::to_string(i);
-		case TOK_FLOAT:
-			return std::to_string(f);
-		case TOK_ID:
-			return std::string(id);
-		default:
-			return std::string("");	
-	}
-}
-
 Token::Token() {
 
 }
@@ -26,6 +12,7 @@ Token::~Token() {
 }
 
 Lexer::Lexer(const std::string& filename): handle(filename) {
+	line = 1;
 	if (!handle.is_open()) {
 		std::cout << "couldn't open '" << filename << "' for reading!\n";
 		exit(1);
@@ -75,6 +62,7 @@ void
 Lexer::handleNumber() {
 	std::string buf;
 	Token t;
+	t.line = line;
 	/* can't define type yet, we don't know if it's a float or integer */
 	while (std::isdigit(peek())) {
 		buf += get();
@@ -101,6 +89,7 @@ Lexer::handleNumber() {
 void
 Lexer::handleIdentifier() {
 	Token t;
+	t.line = line;
 	t.type = TOK_ID;
 	std::string buf;
 	while (true) {
@@ -120,20 +109,22 @@ void
 Lexer::handleOperator() {
 	
 	static const std::string long_ops[] = {
-		[100] = ">>",
-		[101] = "<<"
+		">>",  // 100
+		"<<",  // 101
+		""
 	};
 
 	auto is_long = [](const std::string& op_name) -> int {
-		for (int i = 100; i <= 101; i++) {
+		for (int i = 0; i < 2; i++) {
 			if (op_name == long_ops[i]) {
-				return i;	
+				return i + 100;	
 			}
 		}
 		return -1;
 	};
 
 	Token t;
+	t.line = line;
 	t.type = TOK_OP;
 	char c = get();
 	char p = peek();
@@ -158,6 +149,7 @@ Lexer::handleOperator() {
 void
 Lexer::handleString() {
 	Token t;
+	t.line = line;
 	t.type = TOK_STRING;
 	std::string buf;
 	eat(); // eat "
@@ -180,7 +172,7 @@ Lexer::handleString() {
 void
 Lexer::printTokens() {
 	for (auto& t: tokens) {
-		std::cout << t.word << std::endl;
+		std::cout << (int)t.type << " " << t.word << std::endl;
 	}
 }
 
@@ -213,8 +205,6 @@ Lexer::generateTokens(const std::string& filename) {
 	while (lex.handle.good()) {
 		lex.dispatchFromChar(lex.peek());
 	}
-
-	lex.printTokens();
 
 	return lex.tokens;
 
