@@ -320,7 +320,12 @@ Ast_Node::print(int ind = 0) const {
 		indent(ind + 1);
 		std::cout << "]\n";
 		indent(ind + 1);
-		
+		std::cout << "CHILD: [\n";
+		f->child->print(ind + 2);
+		indent(ind + 1);
+		std::cout << "]\n";
+		indent(ind);
+		std::cout << "]\n"; 	
 	}
 
 }
