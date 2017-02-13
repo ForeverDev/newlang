@@ -1,1 +1,16 @@
-x: static int;
+struct Foo {
+	field: int;
+};
+
+struct Vector {
+	x: int;
+	y: int;
+	z: int;
+	foo: Foo;
+};
+
+factorial: () -> int {
+	vec: Vector;
+	vec = vec;
+}
+
