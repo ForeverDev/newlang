@@ -67,8 +67,8 @@ Lexer::handleNumber() {
 	while (std::isdigit(peek())) {
 		buf += get();
 	}
-	t.type = (peek() == '.') ? TOK_FLOAT : TOK_INT;
-	if (t.type == TOK_INT) {
+	t.type = (peek() == '.') ? TOK_FLOAT : TOK_INTEGER;
+	if (t.type == TOK_INTEGER) {
 		t.i = std::stoll(buf);
 	} else {
 		/* if it's a double, continue eating digits */
@@ -90,7 +90,7 @@ void
 Lexer::handleIdentifier() {
 	Token t;
 	t.line = line;
-	t.type = TOK_ID;
+	t.type = TOK_IDENTIFIER;
 	std::string buf;
 	while (true) {
 		char p = peek();
@@ -108,24 +108,39 @@ Lexer::handleIdentifier() {
 void
 Lexer::handleOperator() {
 	
-	static const std::string long_ops[] = {
+	static const std::vector<std::string> long_ops {
 		">>",  // 100
 		"<<",  // 101
+		"&&",
+		"||",
+		"==",
+		"!=",
+		"+=",
+		"-=",
+		"*=",
+		"/=",
+		"%=",
+		"&=",
+		"|=",
+		"^=",
+		"->",
 		""
 	};
 
 	auto is_long = [](const std::string& op_name) -> int {
-		for (int i = 0; i < 2; i++) {
-			if (op_name == long_ops[i]) {
+		int i = 0;
+		for (const std::string& check: long_ops) {
+			if (op_name == check) {
 				return i + 100;	
 			}
+			i++;
 		}
 		return -1;
 	};
 
 	Token t;
 	t.line = line;
-	t.type = TOK_OP;
+	t.type = TOK_OPERATOR;
 	char c = get();
 	char p = peek();
 	char index;

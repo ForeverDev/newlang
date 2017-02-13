@@ -5,6 +5,6 @@
 int main() {
 
 	std::vector<Token> tokens = Lexer::generateTokens("demo.spy");
-	Tree_Node* tree = Parser::generateSyntaxTree(tokens);
+	Ast_Node* tree = Parser::generateSyntaxTree(tokens);
 
 }

@@ -1,1 +1,1 @@
-if (x > 20 > 30) {}
+x: static int;
