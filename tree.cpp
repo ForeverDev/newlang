@@ -291,7 +291,17 @@ Expression_Call::typecheck(Parse_Context* context) {
 	if (num_args == 1) {
 		compare_args(proc->args[0]->dt, argument->eval, 0);
 	} else if (num_args > 1) {
-
+		Expression_Binary* comma = dynamic_cast<Expression_Binary *>(argument);
+		// walk down to the lowest comma
+		for (int i = 0; i < num_args - 2; i++) {
+			comma = dynamic_cast<Expression_Binary *>(comma->left);
+		}
+		compare_args(proc->args[0]->dt, comma->left->eval, 0);
+		compare_args(proc->args[1]->dt, comma->right->eval, 1);
+		for (int i = 0; i < num_args - 2; i++) {
+			comma = dynamic_cast<Expression_Binary *>(comma->parent);
+			compare_args(proc->args[i + 2]->dt, comma->right->eval, i + 2);
+		}
 	}
 	
 	return (eval = proc->ret);
@@ -397,6 +407,7 @@ Expression_Binary::typecheck(Parse_Context* context) {
 		case BINARY_DIVIDE_BY: {
 			bool is_valid_lhs = (
 				left->isUnaryType(UNARY_DEREFERENCE) ||
+				left->isBinaryType(BINARY_MEMBER_DEREFERENCE) ||
 				left->isAssignment() ||
 				left->type == EXP_IDENTIFIER
 			);	
@@ -1480,8 +1491,9 @@ Parse_Context::parseExpression() {
 Expression*
 Parse_Context::parseAndTypecheckExpression() {
 	Expression* exp = parseExpression();
-	exp->print();
-	exp->typecheck(this);
+	if (exp) {
+		exp->typecheck(this);
+	}
 	return exp;
 }
 
@@ -1671,10 +1683,34 @@ Parse_Context::handleInferredDeclaration() {
 
 void
 Parse_Context::handleReturn() {
+	if (!current_procedure) {
+		die("a return statement can only exist inside of a procedure body");
+	}
 	Ast_Return* node = new Ast_Return();
 	eatIdentifier("return");
 	markOperator("", ";");
 	node->expression = parseAndTypecheckExpression();
+	if (node->expression) {
+		if (!current_procedure->desc->ret->matches(*node->expression->eval)) {
+			std::string err = "attempt to return value of type '";
+			err += node->expression->eval->as_string;
+			err += "' from procedure '";
+			err += current_procedure->identifier;
+			err += "', (expected type '";
+			err += current_procedure->desc->ret->as_string;
+			err += "')";
+			die(err);	
+		}
+	} else {
+		if (current_procedure->desc->ret->type != DATA_VOID) {
+			std::string err = "procedure '";
+			err += current_procedure->identifier;
+			err += "' must return a value of type '";
+			err += current_procedure->desc->ret->as_string;
+			err += "'";
+			die(err);
+		}
+	}
 	eatOperator(";");
 	appendNode(node);
 }

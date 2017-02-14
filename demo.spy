@@ -1,23 +1,18 @@
 struct Foo {
-	field: int;
-};
-
-struct Vector {
-	x: int;
-	y: int;
-	z: int;
-	meme: (int) -> int;
+	ptr: (int) -> int;
 };
 
 factorial: (n: int) -> int {
-	if (n <= 1) return 1;
-	return n * factorial(n - 1);
+
+}
+
+square: (n: int) -> int {
+
 }
 
 main: () -> void {
-
-	thing: Vector;
-
-	thing.meme(5);
+	
+	foo: Foo;
+	foo.ptr = factorial;	
 
 }
