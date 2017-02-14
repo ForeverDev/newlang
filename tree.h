@@ -10,7 +10,7 @@
 #define MOD_CONST   (0x1 << 1)
 #define MOD_FOREIGN (0x1 << 2)
 
-class Parser;
+class Parse_Context;
 
 enum Ast_Node_Type {
 	AST_IF,
@@ -39,8 +39,10 @@ enum Expression_Type {
 	EXP_INTEGER,
 	EXP_FLOAT,
 	EXP_CAST,
+	EXP_CALL,
 	EXP_STRING,
-	EXP_IDENTIFIER
+	EXP_IDENTIFIER,
+	EXP_DATATYPE
 };
 
 enum Expression_Binary_Type {
@@ -73,7 +75,8 @@ enum Expression_Binary_Type {
 	BINARY_COMPARE,
 	BINARY_COMPARE_NOT,
 	BINARY_ASSIGNMENT,
-	BINARY_MEMBER_DEREFERENCE
+	BINARY_MEMBER_DEREFERENCE,
+	BINARY_COMMA
 };
 
 enum Expression_Unary_Type {
@@ -82,7 +85,8 @@ enum Expression_Unary_Type {
 	UNARY_OPEN_PARENTHESIS,
 	UNARY_CLOSE_PARENTHESIS,
 	UNARY_DEREFERENCE,
-	UNARY_ADDRESS_OF
+	UNARY_ADDRESS_OF,
+	UNARY_NEW
 };
 
 enum Expression_Leaf {
@@ -105,6 +109,9 @@ struct Datatype_Base {
 	virtual ~Datatype_Base() {}
 	static std::string toString(const Datatype_Base&);
 	bool matches(const Datatype_Base&) const;
+	bool isRawFloat() const { return type == DATA_FLOAT && !is_ptr && !is_array; }
+	bool isRawInt() const { return type == DATA_INTEGER && !is_ptr && !is_array; }
+	bool isRawProcedure() const { return type == DATA_PROCEDURE && !is_ptr && !is_array; }
 	
 	Datatype_Type type;
 	int size = 0;
@@ -191,7 +198,7 @@ struct Expression {
 
 	Expression(Expression_Type t): type(t) {}
 	virtual ~Expression() {}
-	virtual Datatype_Base* typecheck(Parser*) {};
+	virtual Datatype_Base* typecheck(Parse_Context*) {};
 	void print(int) const;
 	bool isBinaryType(Expression_Binary_Type) const;
 	bool isUnaryType(Expression_Unary_Type) const;
@@ -200,21 +207,21 @@ struct Expression {
 
 struct Expression_Integer : public Expression {
 	Expression_Integer(): Expression(EXP_INTEGER) {}
-	Datatype_Base* typecheck(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
 
 	int64_t value;
 };
 
 struct Expression_Float : public Expression {
 	Expression_Float(): Expression(EXP_FLOAT) {}
-	Datatype_Base* typecheck(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
 
 	double value;
 };	
 
 struct Expression_Identifier : public Expression {
 	Expression_Identifier(): Expression(EXP_IDENTIFIER) {}
-	Datatype_Base* typecheck(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
 
 	std::string value;
 	Var_Declaration* var = nullptr;
@@ -222,23 +229,44 @@ struct Expression_Identifier : public Expression {
 
 struct Expression_String : public Expression {
 	Expression_String(): Expression(EXP_STRING) {}
-	Datatype_Base* typecheck(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
 
 	std::string value;
 };
 
+struct Expression_Datatype : public Expression {
+	Expression_Datatype(): Expression(EXP_DATATYPE) {}
+	virtual Datatype_Base* typecheck(Parse_Context*);
+	
+	Datatype_Base* dt;	
+};
+
 struct Expression_Operator : public Expression {
 	Expression_Operator(Expression_Type t): Expression(t) {}
-	virtual Datatype_Base* typecheck(Parser*) {};
+	virtual Datatype_Base* typecheck(Parse_Context*) {};
 
 	const Operator_Descriptor* desc = nullptr;	
 };
 
+struct Expression_Call : public Expression_Operator {
+	Expression_Call(): Expression_Operator(EXP_CALL) {
+		desc = new Operator_Descriptor("CALL", 11, ASSOC_LEFT, OP_UNARY);	
+	}
+	~Expression_Call() {
+		delete desc;
+	}
+	virtual Datatype_Base* typecheck(Parse_Context*);
+
+	Expression* procedure = nullptr;
+	Expression* argument = nullptr;
+	int num_args = 0;
+};	
+
 struct Expression_Binary : public Expression_Operator {
 	Expression_Binary(): Expression_Operator(EXP_BINARY) {}
 	static Expression_Binary_Type wordToBinaryType(const std::string&);
-	Datatype_Base* typecheck(Parser*);
-	void assertMatch(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
+	void assertMatch(Parse_Context*);
 	
 	Expression_Binary_Type optype;	
 	Expression* left = nullptr;
@@ -248,26 +276,23 @@ struct Expression_Binary : public Expression_Operator {
 struct Expression_Unary : public Expression_Operator {
 	Expression_Unary(): Expression_Operator(EXP_UNARY) {}
 	static Expression_Unary_Type wordToUnaryType(const std::string&);
-	Datatype_Base* typecheck(Parser*);
+	virtual Datatype_Base* typecheck(Parse_Context*);
 	
 	Expression_Unary_Type optype;
 	Expression* operand = nullptr;
 };
 
 struct Expression_Cast : public Expression_Operator {
-	Expression_Cast(): Expression_Operator(EXP_CAST) {
-		// is this a bad thing to do? for now, every cast has its
-		// own desc object instead of a pointer into operator_table....
-		// it gets freed by the destructor... maybe change this later
-		desc = new Operator_Descriptor("CAST", 10, ASSOC_LEFT, OP_UNARY);
+	Expression_Cast() : Expression_Operator(EXP_CAST) {
+		desc = new Operator_Descriptor("CAST", 10, ASSOC_RIGHT, OP_UNARY);	
 	}
-	~Expression_Cast() { 
-		delete desc; 
-	} 
-	Datatype_Base* typecheck(Parser*);
-
-	Datatype_Base* target;
-	Expression* operand = nullptr;
+	~Expression_Cast() {
+		delete desc;
+	}
+	virtual Datatype_Base* typecheck(Parse_Context*);
+	
+	Datatype_Base* target = nullptr;
+	Expression* operand = nullptr;	
 };
 
 struct Ast_Node {
@@ -331,7 +356,7 @@ struct Ast_Return : public Ast_Node {
 	Expression* expression = nullptr;
 };
 
-class Parser {
+class Parse_Context {
 	
 	public:
 		int num_tokens;
@@ -354,7 +379,7 @@ class Parser {
 		Datatype_Base* type_bool;
 		Datatype_Base* type_void;
 
-		Parser();
+		Parse_Context();
 		static Ast_Node* generateSyntaxTree(std::vector<Token>&);
 		void handleIf();
 		void handleWhile();
@@ -363,12 +388,14 @@ class Parser {
 		void handleCloseBlock();
 		void handleStatement();
 		void handleDeclaration();
+		void handleInferredDeclaration();
 		void handleReturn();
 		void handleStruct();
 		void handleDefine();
 		void registerLocal(Var_Declaration*);
 		void die(const std::string&);
 		void undeclaredIdentifier(const std::string&);
+		void typeMismatch(const std::string&, const Datatype_Base&, const Datatype_Base&);
 		void focusTokens(std::vector<Token>&);
 		void setIndex(int);
 		void next();
@@ -387,7 +414,9 @@ class Parser {
 		Expression* parseAndTypecheckExpression();
 		uint32_t parseModifiers();
 		bool matchesDeclaration();
+		bool matchesDatatype();
 		Datatype_Base* parseDatatype();
+		Expression_Datatype* parseDatatypeAsExpression();
 		Var_Declaration* parseDeclaration();
 		Datatype_Base* getTypeInfo(const std::string&);
 		Var_Declaration* getLocal(const std::string&);

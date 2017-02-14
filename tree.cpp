@@ -46,33 +46,36 @@ static const OpEntry prec[127] = {
 */
 
 static const std::vector<Operator_Descriptor> operator_table {
-	Operator_Descriptor("=",  2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("+=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("-=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("*=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("/=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("%=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("&=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("|=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("^=", 2, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("&&", 3, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("||", 3, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("==", 4, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("!=", 4, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor(">",  6, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor(">=", 6, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("<",  6, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("<=", 6, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("<<", 7, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor(">>", 7, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("+",  8, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("-",  8, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("*",  9, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("/",  9, ASSOC_LEFT, OP_BINARY),
-	Operator_Descriptor("@",  10, ASSOC_RIGHT, OP_UNARY),
-	Operator_Descriptor("$",  10, ASSOC_RIGHT, OP_UNARY),
-	Operator_Descriptor("!",  10, ASSOC_RIGHT, OP_UNARY),
-	Operator_Descriptor(".",  11, ASSOC_LEFT, OP_BINARY)
+	Operator_Descriptor(",",        1, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("=",        2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("+=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("-=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("*=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("/=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("%=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("&=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("|=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("^=",       2, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("&&",       3, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("||",       3, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("==",       4, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("!=",       4, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor(">",        6, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor(">=",       6, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("<",        6, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("<=",       6, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("<<",       7, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor(">>",       7, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("+",        8, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("-",        8, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("*",        9, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("/",        9, ASSOC_LEFT, OP_BINARY),
+	Operator_Descriptor("__CAST__", 10, ASSOC_RIGHT, OP_UNARY),
+	Operator_Descriptor("@",        10, ASSOC_RIGHT, OP_UNARY),
+	Operator_Descriptor("$",        10, ASSOC_RIGHT, OP_UNARY),
+	Operator_Descriptor("!",        10, ASSOC_RIGHT, OP_UNARY),
+	Operator_Descriptor("new",      10, ASSOC_RIGHT, OP_UNARY),
+	Operator_Descriptor(".",        11, ASSOC_LEFT, OP_BINARY)
 };
 
 static const Operator_Descriptor*
@@ -190,6 +193,8 @@ Expression_Binary::wordToBinaryType(const std::string& word) {
 		return BINARY_ASSIGNMENT;
 	else if (word == ".")
 		return BINARY_MEMBER_DEREFERENCE;
+	else if (word == ",")
+		return BINARY_COMMA;
 }
 
 Expression_Unary_Type
@@ -206,36 +211,100 @@ Expression_Unary::wordToUnaryType(const std::string& word) {
 		return UNARY_DEREFERENCE;
 	else if (word == "@")
 		return UNARY_ADDRESS_OF;
+	else if (word == "new")
+		return UNARY_NEW;
 }
 
 Datatype_Base*
-Expression_Integer::typecheck(Parser* context) {
+Expression_Integer::typecheck(Parse_Context* context) {
 	return (eval = context->getTypeInfo("int"));	
 }
 
 Datatype_Base*
-Expression_Float::typecheck(Parser* context) {
+Expression_Float::typecheck(Parse_Context* context) {
 	return (eval = context->getTypeInfo("float"));
 }
 
 Datatype_Base*
-Expression_Identifier::typecheck(Parser* context) {
-	return (eval = context->getTypeInfo("void"));
+Expression_Datatype::typecheck(Parse_Context* context) {
+	return (eval = dt);
 }
 
 Datatype_Base*
-Expression_String::typecheck(Parser* context) {
-	return (eval = context->getTypeInfo("string"));
-}
-
-Datatype_Base*
-Expression_Cast::typecheck(Parser* context) {
-	Datatype_Base* op_dt = operand->typecheck(context);
+Expression_Cast::typecheck(Parse_Context* context) {
+	operand->typecheck(context);
 	return (eval = target);
 }
 
+Datatype_Base*
+Expression_Identifier::typecheck(Parse_Context* context) {
+	Var_Declaration* local = context->getLocal(value);
+	if (!local) {
+		return (eval = context->getTypeInfo("void"));
+	}
+	return (eval = local->dt);
+}
+
+Datatype_Base*
+Expression_Call::typecheck(Parse_Context* context) {
+	if (argument) {
+		argument->typecheck(context);
+	}
+	Datatype_Procedure* proc;
+	Expression_Identifier* id;
+	Datatype_Base* proc_exp = procedure->typecheck(context);
+	std::string func_name = "";
+	if (!proc_exp->isRawProcedure()) {
+		context->die("attempt to call a non-procedure (got type '" + proc_exp->as_string + "')");
+	}
+	id = dynamic_cast<Expression_Identifier *>(procedure);
+	func_name += (id ? id->value : "<computed_call>");
+	proc = dynamic_cast<Datatype_Procedure *>(proc_exp);
+	if (num_args != proc->args.size()) {
+		std::string err = "passing incorrect number of arguments to function '";
+		err += func_name;
+		err += "' expected ";
+		err += std::to_string(proc->args.size());
+		err += ", got ";
+		err += std::to_string(num_args);
+		context->die(err);
+	}
+	
+	auto compare_args = [&context, &proc, &func_name](Datatype_Base* expected, Datatype_Base* check, int index) -> void {
+		Var_Declaration* arg = proc->args[index]; 
+		if (!expected->matches(*check)) {
+			std::string err = "argument type mismatch when calling function '";
+			err += func_name;
+			err += "'; argument '";
+			err += arg->identifier;
+			err += "' (arg #";
+			err += std::to_string(index + 1);
+			err += ") should be of type '";
+			err += expected->as_string;
+			err += "', got type '";
+			err += check->as_string;
+			err += "'";
+			context->die(err); 
+		}
+	};
+
+	if (num_args == 1) {
+		compare_args(proc->args[0]->dt, argument->eval, 0);
+	} else if (num_args > 1) {
+
+	}
+	
+	return (eval = proc->ret);
+
+}
+
+Datatype_Base*
+Expression_String::typecheck(Parse_Context* context) {
+	return (eval = context->getTypeInfo("string"));
+}
+
 void
-Expression_Binary::assertMatch(Parser* context) {
+Expression_Binary::assertMatch(Parse_Context* context) {
 	Datatype_Base* lhs = left->typecheck(context);
 	Datatype_Base* rhs = right->typecheck(context);
 	if (!lhs->matches(*rhs)) {
@@ -251,8 +320,12 @@ Expression_Binary::assertMatch(Parser* context) {
 }
 
 Datatype_Base*
-Expression_Binary::typecheck(Parser* context) {
+Expression_Binary::typecheck(Parse_Context* context) {
 	switch (optype) {
+		case BINARY_COMMA:
+			left->typecheck(context);
+			right->typecheck(context);
+			break;
 		case BINARY_ADDITION:
 		case BINARY_SUBTRACTION:	
 		case BINARY_MULTIPLICATION:
@@ -342,14 +415,7 @@ Expression_Binary::typecheck(Parser* context) {
 				id->eval = local->dt;
 				id->var = local;
 				if (!local->dt->matches(*right->typecheck(context))) {
-					std::string err = "assignment '";
-					err += word;
-					err += "' type mismatch (got '";
-					err += local->dt->as_string;
-					err += "' and '";
-					err += right->eval->as_string;
-					err += "')";
-					context->die(err);
+					context->typeMismatch(word, *local->dt, *right->eval);
 				}
 			} else {
 				assertMatch(context);
@@ -406,8 +472,12 @@ Expression_Binary::typecheck(Parser* context) {
 }
 
 Datatype_Base*
-Expression_Unary::typecheck(Parser* context) {
+Expression_Unary::typecheck(Parse_Context* context) {
 	Datatype_Base* op = operand->typecheck(context);
+	switch (optype) {
+		case UNARY_NEW:
+			break;	
+	}
 	return (eval = op);
 }
 
@@ -430,7 +500,9 @@ Expression::print(int ind = 0) const {
 	const Expression_Identifier* c = dynamic_cast<const Expression_Identifier *>(this);
 	const Expression_Binary*     d = dynamic_cast<const Expression_Binary *>(this);
 	const Expression_Unary*      e = dynamic_cast<const Expression_Unary *>(this);
-	const Expression_Cast*	     f = dynamic_cast<const Expression_Cast *>(this);
+	const Expression_Datatype*   f = dynamic_cast<const Expression_Datatype* >(this);
+	const Expression_Call*	     g = dynamic_cast<const Expression_Call *>(this);
+	const Expression_Cast*	     h = dynamic_cast<const Expression_Cast *>(this);
 
 	indent(ind);
 
@@ -448,10 +520,16 @@ Expression::print(int ind = 0) const {
 		std::cout << word << std::endl;
 		e->operand->print(ind + 1);
 	} else if (f) {
+		std::cout << f->dt->as_string << std::endl;
+	} else if (g) {
+		std::cout << "CALL" << std::endl;
+		g->procedure->print(ind + 1);
+		g->argument->print(ind + 1);
+	} else if (h) {
 		std::cout << "CAST" << std::endl;
 		indent(ind + 1);
-		std::cout << f->target->as_string << std::endl;
-		f->operand->print(ind + 1);
+		std::cout << h->target->as_string << std::endl;
+		h->operand->print(ind + 1);
 	}
 
 }
@@ -606,6 +684,9 @@ Datatype_Base::matches(const Datatype_Base& other) const {
 	if (type == DATA_PROCEDURE) {
 		const Datatype_Procedure* a = dynamic_cast<const Datatype_Procedure *>(this);
 		const Datatype_Procedure* b = dynamic_cast<const Datatype_Procedure *>(&other);
+		if (a->args.size() != b->args.size()) {
+			return false;
+		}
 		for (int i = 0; i < a->args.size(); i++) {
 			if (!a->args[i]->dt->matches(*b->args[i]->dt)) {
 				return false;
@@ -614,6 +695,9 @@ Datatype_Base::matches(const Datatype_Base& other) const {
 	} else if (type == DATA_STRUCT) {
 		const Datatype_Struct* a = dynamic_cast<const Datatype_Struct *>(this);
 		const Datatype_Struct* b = dynamic_cast<const Datatype_Struct *>(this);
+		if (a->members.size() != b->members.size()) {
+			return false;
+		}
 		for (int i = 0; i < a->members.size(); i++) {
 			if (!a->members[i]->dt->matches(*b->members[i]->dt)) {
 				return false;
@@ -703,7 +787,7 @@ Datatype_Struct::tostr() const {
 
 /* ------ PARSER IMPL ------ */
 
-Parser::Parser() {
+Parse_Context::Parse_Context() {
 	num_tokens = 0; // TBI
 	token_index = 0;
 	marked = 0;
@@ -757,7 +841,7 @@ Parser::Parser() {
 }
 
 void
-Parser::die(const std::string& message) {
+Parse_Context::die(const std::string& message) {
 	Token* f = focus ?: prev_focus;
 	std::cout << "!!! PARSE ERROR !!!\n";
 	std::cout << "\tmessage: " << message << std::endl;
@@ -766,12 +850,24 @@ Parser::die(const std::string& message) {
 }
 
 void
-Parser::undeclaredIdentifier(const std::string& name) {
+Parse_Context::undeclaredIdentifier(const std::string& name) {
 	die("unexpected identifier '" + name + "'");
 }
 
+void
+Parse_Context::typeMismatch(const std::string& op_word, const Datatype_Base& left, const Datatype_Base& right) {
+	std::string err = "operator '";
+	err += op_word;
+	err += "' type mismatch (got '";
+	err += left.as_string;
+	err += "' and '";
+	err += right.as_string;
+	err += "')";
+	die(err);
+}
+
 void 
-Parser::focusTokens(std::vector<Token>& toks) {
+Parse_Context::focusTokens(std::vector<Token>& toks) {
 	tokens = &toks;
 	num_tokens = toks.size();
 	token_index = 0;	
@@ -780,7 +876,7 @@ Parser::focusTokens(std::vector<Token>& toks) {
 }
 
 Token*
-Parser::peek() {
+Parse_Context::peek() {
 	if (!focus) {
 		return nullptr;
 	}
@@ -788,7 +884,7 @@ Parser::peek() {
 }
 
 void
-Parser::next() {
+Parse_Context::next() {
 	if (!focus) {
 		die("unexpected EOF");
 	}
@@ -802,7 +898,7 @@ Parser::next() {
 }
 
 void
-Parser::setIndex(int index) {
+Parse_Context::setIndex(int index) {
 	token_index = index;
 	if (token_index >= num_tokens) {
 		focus = nullptr;
@@ -812,53 +908,53 @@ Parser::setIndex(int index) {
 }
 
 Token*
-Parser::atIndex(int index) {
+Parse_Context::atIndex(int index) {
 	return &((*tokens)[index]);
 }
 
 bool
-Parser::isOperator() {
+Parse_Context::isOperator() {
 	return focus->type == TOK_OPERATOR;
 }
 
 bool 
-Parser::isIdentifier() {
+Parse_Context::isIdentifier() {
 	return focus->type == TOK_IDENTIFIER;
 }
 
 bool 
-Parser::onOperator(const std::string& word) {
+Parse_Context::onOperator(const std::string& word) {
 	return isOperator() && focus->word == word;
 }
 
 bool
-Parser::onIdentifier(const std::string& identifier) {
+Parse_Context::onIdentifier(const std::string& identifier) {
 	return isIdentifier() && focus->id == identifier;
 }
 
 void 
-Parser::eatOperator(const std::string& word) {
+Parse_Context::eatOperator(const std::string& word) {
 	if (!onOperator(word)) {
-		die("expected operator (" + word + ")");
+		die("expected operator '" + word + "', got token '" + focus->word + "'");
 	}
 	next();
 }
 
 void
-Parser::eatIdentifier(const std::string& expected) {
+Parse_Context::eatIdentifier(const std::string& expected) {
 	if (!onIdentifier(expected)) {
-		die("expected identifier '" + expected + "'");
+		die("expected identifier '" + expected + "', got token '" + focus->word + "'");
 	}
 	next();
 }
 
 void
-Parser::printOn() {
+Parse_Context::printOn() {
 	std::cout << "ON: (word: " << focus->word << ", line: " << focus->line << ")\n";
 }
 
 void
-Parser::markOperator(const std::string& inc, const std::string& dec) {
+Parse_Context::markOperator(const std::string& inc, const std::string& dec) {
 	int start = token_index;
 	int count = 1;
 	while (true) {
@@ -877,7 +973,7 @@ Parser::markOperator(const std::string& inc, const std::string& dec) {
 }
 
 Datatype_Base*
-Parser::getTypeInfo(const std::string& type_name) {
+Parse_Context::getTypeInfo(const std::string& type_name) {
 	for (Var_Declaration* decl: defined_types) {
 		if (decl->identifier == type_name) {
 			return decl->dt;
@@ -887,7 +983,7 @@ Parser::getTypeInfo(const std::string& type_name) {
 }
 
 Var_Declaration*
-Parser::getLocal(const std::string& identifier) {
+Parse_Context::getLocal(const std::string& identifier) {
 	Ast_Block* block = current_block;
 	if (current_procedure) {
 		for (Var_Declaration* arg: current_procedure->desc->args) {
@@ -912,7 +1008,7 @@ Parser::getLocal(const std::string& identifier) {
 }
 
 uint32_t
-Parser::parseModifiers() {
+Parse_Context::parseModifiers() {
 	
 	static const std::vector<std::string> modifiers {
 		"static",
@@ -941,7 +1037,7 @@ Parser::parseModifiers() {
 }
 
 Datatype_Base*
-Parser::parseDatatype() {
+Parse_Context::parseDatatype() {
 
 	Datatype_Base* ret;
 	Datatype_Base* type_info;
@@ -977,8 +1073,17 @@ Parser::parseDatatype() {
 	} else if (onOperator("(")) {
 		Datatype_Procedure* proc = new Datatype_Procedure();
 		eatOperator("(");
-		while (matchesDeclaration()) {
-			Var_Declaration* arg = parseDeclaration();
+		while (matchesDeclaration() || matchesDatatype()) {
+			bool has_name = matchesDeclaration();
+			Var_Declaration* arg;
+			if (has_name) {
+				arg = parseDeclaration();
+			} else {
+				arg = new Var_Declaration();
+				arg->named = false;
+				arg->dt = parseDatatype();
+				arg->as_string = Var_Declaration::toString(*arg); 
+			}
 			proc->args.push_back(arg);
 			if (focus->word == ",") {
 				next();
@@ -1073,8 +1178,20 @@ Parser::parseDatatype() {
 
 }
 
+Expression_Datatype*
+Parse_Context::parseDatatypeAsExpression() {
+	
+	Expression_Datatype* dt = new Expression_Datatype();
+	dt->dt = parseDatatype();
+	dt->dt->as_string = Datatype_Base::toString(*dt->dt);
+	dt->word = dt->dt->as_string;
+
+	return dt;
+
+}
+
 bool
-Parser::matchesDeclaration() {
+Parse_Context::matchesDeclaration() {
 	Token* p = peek();
 	if (!p) {
 		return false;
@@ -1082,8 +1199,24 @@ Parser::matchesDeclaration() {
 	return isIdentifier() && p->word == ":"; 
 }
 
+// TODO make this better
+bool
+Parse_Context::matchesDatatype() {
+	std::string& word = focus->word;
+	if (word == "static" || word == "const" || word == "foreign") {
+		return true;
+	}
+	if (word == "^" || word == "[") {
+		return true;
+	}
+	if (getTypeInfo(word)) {
+		return true;
+	}
+	return false;
+}
+
 Var_Declaration*
-Parser::parseDeclaration() {
+Parse_Context::parseDeclaration() {
 	
 	Var_Declaration* decl = new Var_Declaration();	
 	decl->identifier = focus->word;
@@ -1103,7 +1236,7 @@ Parser::parseDeclaration() {
 }
 
 Expression*
-Parser::parseExpression() {
+Parse_Context::parseExpression() {
 
 	std::vector<Token> raw;
 	std::vector<Expression_Operator*> ops;
@@ -1111,10 +1244,7 @@ Parser::parseExpression() {
 	Expression* exp;
 
 	if (token_index == marked) {
-		/* is this nasty? return 0 for now */
-		Expression_Integer* e = new Expression_Integer();
-		e->value = 0;
-		return e;
+		return nullptr;
 	}
 	
 	// first, gather the raw expression
@@ -1122,112 +1252,160 @@ Parser::parseExpression() {
 		raw.push_back(*atIndex(i));
 	}
 
+	auto shunting_pops = [&ops, &postfix](const Operator_Descriptor* desc) -> void {
+		Expression_Operator* back;
+		while (true) {
+			if (ops.size() == 0) {
+				break;
+			}
+			back = ops.back();
+			// bug?
+			if (back->isUnaryType(UNARY_OPEN_PARENTHESIS)) {
+				break;
+			}
+			if (desc->assoc == ASSOC_LEFT) {
+				if (desc->prec > back->desc->prec) break;
+			} else {
+				if (desc->prec >= back->desc->prec) break;
+			}
+			postfix.push_back(back);
+			ops.pop_back();
+		}
+	};
+
 	// now scan the expression and use shunting yard
-	for (int i = token_index; i < marked; i++) {
-		Token& tok = *atIndex(i);
-		switch (tok.type) {
-			case TOK_INTEGER: {
-				Expression_Integer* push = new Expression_Integer();
-				push->value = tok.i;
-				push->word = tok.word;
-				postfix.push_back(push);
-				break;
-			}
-			case TOK_FLOAT: {
-				Expression_Float* push = new Expression_Float();
-				push->value = tok.f;
-				push->word = tok.word;
-				postfix.push_back(push);
-				break;
-			}
-			case TOK_STRING: {
-				Expression_String* push = new Expression_String();
-				push->value = tok.word;
-				push->word = tok.word;
-				postfix.push_back(push);
-				break;
-			}
-			case TOK_IDENTIFIER: {
-				Expression_Identifier* push = new Expression_Identifier();
-				push->value = tok.word;
-				push->word = tok.word;
-				postfix.push_back(push);
-				break;
-			}
-			case TOK_OPERATOR: {
-				switch (tok.i) {
-					case '(': { 
-						Expression_Unary* push = new Expression_Unary();
-						push->optype = UNARY_OPEN_PARENTHESIS;
-						push->word = "(";
-						ops.push_back(push);
-						break;
-					}
-					case ')': {
-						Expression* back;
-						while (true) {
-							if (ops.size() == 0) {
-								die("unexpected closing parenthesis");
-							}
-							back = ops.back();
-							if (back->isUnaryType(UNARY_OPEN_PARENTHESIS)) {
-								break;
-							}
-							postfix.push_back(back);
-							ops.pop_back();
-						}
-						ops.pop_back();
-						break;
-					}
-					default: {
-						const Operator_Descriptor* desc = get_operator_descriptor(tok.word);
-						Expression_Operator* push;
-						if (!desc) {
-							std::string err = "unknown operator '";
-							err += tok.word;
-							err += "'";
-							die(err);
-						}
-						if (desc->operand_type == OP_BINARY) {
-							Expression_Binary* op = new Expression_Binary();
-							op->optype = Expression_Binary::wordToBinaryType(tok.word);
-							push = op;
-						} else if (desc->operand_type == OP_UNARY) {
-							Expression_Unary* op = new Expression_Unary();
-							op->optype = Expression_Unary::wordToUnaryType(tok.word);
-							push = op;
-						}
-						push->desc = desc;
-						push->word = tok.word;
-						Expression_Operator* back;
-						while (true) {
-							if (ops.size() == 0) {
-								break;
-							}
-							back = ops.back();
-							// bug?
-							if (back->isUnaryType(UNARY_OPEN_PARENTHESIS)) {
-								break;
-							}
-							if (desc->assoc == ASSOC_LEFT) {
-								if (desc->prec > back->desc->prec) break;
-							} else {
-								if (desc->prec >= back->desc->prec) break;
-							}
-							postfix.push_back(back);
-							ops.pop_back();
-						}
-						ops.push_back(push);
-						break;
-					}
+	int start = token_index;
+	while (token_index < marked) {
+		Token& tok = *focus;
+		Token* prev = nullptr;
+		if (token_index - 1 >= start) {
+			prev = atIndex(token_index - 1);
+		}
+		if (matchesDatatype()) {
+			Expression_Datatype* dt = parseDatatypeAsExpression();
+			postfix.push_back(dt);
+		} else {
+			next();
+			switch (tok.type) {
+				case TOK_INTEGER: {
+					Expression_Integer* push = new Expression_Integer();
+					push->value = tok.i;
+					push->word = tok.word;
+					postfix.push_back(push);
+					break;
 				}
-				break;
+				case TOK_FLOAT: {
+					Expression_Float* push = new Expression_Float();
+					push->value = tok.f;
+					push->word = tok.word;
+					postfix.push_back(push);
+					break;
+				}
+				case TOK_STRING: {
+					Expression_String* push = new Expression_String();
+					push->value = tok.word;
+					push->word = tok.word;
+					postfix.push_back(push);
+					break;
+				}
+				case TOK_IDENTIFIER: {
+					Expression_Identifier* push = new Expression_Identifier();
+					push->value = tok.word;
+					push->word = tok.word;
+					postfix.push_back(push);
+					break;
+				}
+				case TOK_OPERATOR: {
+					switch (tok.i) {
+						case '(': { 
+							if (prev && prev->type == TOK_IDENTIFIER) {
+								int finish_save = marked;
+								Expression_Call* push = new Expression_Call();
+								markOperator("(", ")");
+								push->argument = parseExpression();
+								next(); // skip )
+								marked = finish_save;
+
+								// count the number of arguments to the call by walking the comma tree
+								if (push->argument) {
+									push->num_args++;
+									Expression* scan = push->argument;
+									while (scan && scan->isBinaryType(BINARY_COMMA)) {
+										push->num_args++;
+										scan = dynamic_cast<Expression_Binary *>(scan)->left;
+									}
+								}		
+								shunting_pops(push->desc);
+								ops.push_back(push);
+							} else {
+								Expression_Unary* push = new Expression_Unary();
+								push->optype = UNARY_OPEN_PARENTHESIS;
+								push->word = "(";
+								ops.push_back(push);
+							}
+							break;
+						}
+						case ')': {
+							Expression* back;
+							while (true) {
+								if (ops.size() == 0) {
+									die("unexpected closing parenthesis");
+								}
+								back = ops.back();
+								if (back->isUnaryType(UNARY_OPEN_PARENTHESIS)) {
+									break;
+								}
+								postfix.push_back(back);
+								ops.pop_back();
+							}
+							ops.pop_back();
+							break;
+						}
+						case '#': {
+							Expression_Cast* push = new Expression_Cast();
+							push->word = "__CAST__";
+							push->target = parseDatatype();
+							shunting_pops(push->desc);
+							ops.push_back(push);
+							break;
+						}
+						default: {
+							const Operator_Descriptor* desc = get_operator_descriptor(tok.word);
+							Expression_Operator* push;
+							if (!desc) {
+								std::string err = "unknown operator '";
+								err += tok.word;
+								err += "'";
+								die(err);
+							}
+							if (desc->operand_type == OP_BINARY) {
+								Expression_Binary* op = new Expression_Binary();
+								op->optype = Expression_Binary::wordToBinaryType(tok.word);
+								push = op;
+							} else if (desc->operand_type == OP_UNARY) {
+								Expression_Unary* op = new Expression_Unary();
+								op->optype = Expression_Unary::wordToUnaryType(tok.word);
+								push = op;
+							}
+							push->desc = desc;
+							push->word = tok.word;
+							shunting_pops(desc);
+							ops.push_back(push);
+							break;
+						}
+					}
+					break;
+				}
 			}
 		}
 	}
 	while (ops.size() > 0) {
-		postfix.push_back(ops.back());
-		ops.pop_back();
+		Expression_Operator* back = ops.back();
+		if (back->isUnaryType(UNARY_OPEN_PARENTHESIS)) {
+			die("mismatched parentheses");
+		}
+		postfix.push_back(back);
+		ops.pop_back(); 
 	}	
 
 	std::vector<Expression*> last;
@@ -1237,6 +1415,7 @@ Parser::parseExpression() {
 			case EXP_INTEGER:
 			case EXP_FLOAT:
 			case EXP_IDENTIFIER:
+			case EXP_DATATYPE:
 				last.push_back(e);
 				break;	
 			case EXP_BINARY: {
@@ -1268,6 +1447,24 @@ Parser::parseExpression() {
 				last.push_back(e);
 				break;
 			}
+			case EXP_CAST: {
+				Expression_Cast* cast_op = dynamic_cast<Expression_Cast *>(e);
+				Expression* operand = last.back();
+				last.pop_back();
+				cast_op->operand = operand;
+				operand->parent = e;
+				last.push_back(e);
+				break;
+			}
+			case EXP_CALL: {
+				Expression_Call* call_op = dynamic_cast<Expression_Call *>(e);
+				Expression* operand = last.back();
+				last.pop_back();
+				call_op->procedure = operand;
+				operand->parent = e;
+				last.push_back(e);
+				break;
+			}
 		}
 	}
 	
@@ -1281,7 +1478,7 @@ Parser::parseExpression() {
 }
 
 Expression*
-Parser::parseAndTypecheckExpression() {
+Parse_Context::parseAndTypecheckExpression() {
 	Expression* exp = parseExpression();
 	exp->print();
 	exp->typecheck(this);
@@ -1289,7 +1486,7 @@ Parser::parseAndTypecheckExpression() {
 }
 
 void
-Parser::handleIf() {
+Parse_Context::handleIf() {
 	Ast_If* node = new Ast_If();
 	eatIdentifier("if");
 	eatOperator("(");
@@ -1300,7 +1497,7 @@ Parser::handleIf() {
 }
 
 void
-Parser::handleWhile() {
+Parse_Context::handleWhile() {
 	Ast_While* node = new Ast_While();
 	eatIdentifier("while");
 	eatOperator("(");
@@ -1311,7 +1508,7 @@ Parser::handleWhile() {
 }
 
 void
-Parser::handleFor() {
+Parse_Context::handleFor() {
 	Ast_For* node = new Ast_For();
 	eatIdentifier("for");
 	eatOperator("(");
@@ -1328,7 +1525,7 @@ Parser::handleFor() {
 }
 
 void
-Parser::handleBlock() {
+Parse_Context::handleBlock() {
 	Ast_Block* node = new Ast_Block();
 	eatOperator("{");
 	appendNode(node);
@@ -1336,7 +1533,7 @@ Parser::handleBlock() {
 }
 
 void
-Parser::handleCloseBlock() {
+Parse_Context::handleCloseBlock() {
 	Ast_Node* parent = current_block->parent;
 	while (parent && !dynamic_cast<Ast_Block *>(parent)) {
 		parent = parent->parent;
@@ -1349,7 +1546,7 @@ Parser::handleCloseBlock() {
 }
 
 void
-Parser::handleStatement() {
+Parse_Context::handleStatement() {
 	Ast_Statement* node = new Ast_Statement();
 	markOperator("", ";");
 	node->expression = parseAndTypecheckExpression();
@@ -1358,10 +1555,14 @@ Parser::handleStatement() {
 }
 
 void
-Parser::handleDeclaration() {
+Parse_Context::handleDeclaration() {
 
 	Var_Declaration* decl = parseDeclaration();
 	Datatype_Base* dt = decl->dt;
+
+	if (getLocal(decl->identifier)) {
+		die("duplicate variable '" + decl->identifier + "'");
+	}
 
 	// if its a procedure followed by {, it's an implementation */
 	if (dt->type == DATA_PROCEDURE && onOperator("{")) {
@@ -1388,19 +1589,88 @@ Parser::handleDeclaration() {
 		
 		defined_procedures.push_back(node);
 		appendNode(node);
+		registerLocal(decl);
+	
+	// declaration and assignment?
+	} else if (onOperator("=")) {
+		Ast_Statement* state;
+		Expression_Identifier* id;
+		Expression_Binary* assign;
+		
+		registerLocal(decl);
 
+		// manually patch together an assignment
+		state = new Ast_Statement();
+		id = new Expression_Identifier();
+		assign = new Expression_Binary();
+
+		next(); // skip '='
+		markOperator("", ";");
+		id->word = decl->identifier;
+		id->value = decl->identifier;
+		assign->optype = BINARY_ASSIGNMENT;
+		assign->left = id;
+		assign->right = parseAndTypecheckExpression(); 	
+		assign->left->parent = assign;
+		assign->right->parent = assign;
+		assign->word = "=";
+		state->expression = assign;
+		if (!assign->right->eval->matches(*decl->dt)) {
+			typeMismatch("=", *decl->dt, *assign->right->eval);
+		}
+		appendNode(state);
+	} else {
+		registerLocal(decl);
 	}
-
-	if (getLocal(decl->identifier)) {
-		die("re-declaration of local '" + decl->identifier + "'");
-	}
-
-	registerLocal(decl);
 
 }
 
 void
-Parser::handleReturn() {
+Parse_Context::handleInferredDeclaration() {
+	
+	Var_Declaration* decl = new Var_Declaration();
+	decl->identifier = focus->word;
+	next(); // skip identifier
+	next(); // skip ':='
+	markOperator("", ";");
+	Expression* exp = parseAndTypecheckExpression();
+	decl->dt = exp->eval;
+	decl->as_string = Var_Declaration::toString(*decl);
+	
+	if (exp->eval->type == DATA_STRUCT && !exp->eval->is_ptr) {
+		die("attempt to assign to an object");
+	}
+	if (exp->eval->type == DATA_VOID) {
+		die("attempt to assign expression that evaluates to type 'void'");
+	}
+	if (getLocal(decl->identifier)) {
+		die("duplicate variable '" + decl->identifier + "'");
+	}
+
+	// now we need to manually make an expression and append it
+	Ast_Statement* state;
+	Expression_Identifier* id;
+	Expression_Binary* assign;
+	state = new Ast_Statement();
+	id = new Expression_Identifier();
+	assign = new Expression_Binary();
+	id->value = decl->identifier;
+	id->word = decl->identifier;
+	assign->optype = BINARY_ASSIGNMENT;
+	assign->word = "=";
+	assign->right = exp;
+	assign->left = id;
+	assign->right->parent = assign;
+	assign->left->parent = assign;
+	state->expression = assign;
+	appendNode(state);
+
+	eatOperator(";");
+	registerLocal(decl);
+}
+
+void
+Parse_Context::handleReturn() {
 	Ast_Return* node = new Ast_Return();
 	eatIdentifier("return");
 	markOperator("", ";");
@@ -1410,7 +1680,7 @@ Parser::handleReturn() {
 }
 
 void
-Parser::handleStruct() {
+Parse_Context::handleStruct() {
 	Var_Declaration* decl = new Var_Declaration();
 	Datatype_Struct* str = new Datatype_Struct();
 	decl->dt = str;
@@ -1435,7 +1705,7 @@ Parser::handleStruct() {
 }
 
 void
-Parser::handleDefine() {
+Parse_Context::handleDefine() {
 	Var_Declaration* decl;
 	eatIdentifier("define");
 	if (!matchesDeclaration()) {
@@ -1447,12 +1717,12 @@ Parser::handleDefine() {
 }
 
 void
-Parser::registerLocal(Var_Declaration* local) {
+Parse_Context::registerLocal(Var_Declaration* local) {
 	current_block->locals.push_back(local);
 }
 
 void
-Parser::appendNode(Ast_Node* node) {
+Parse_Context::appendNode(Ast_Node* node) {
 	if (append_target) {
 		switch (append_target->type) {
 			case AST_IF:
@@ -1489,9 +1759,9 @@ Parser::appendNode(Ast_Node* node) {
 }
 
 Ast_Node*
-Parser::generateSyntaxTree(std::vector<Token>& tokens) {
+Parse_Context::generateSyntaxTree(std::vector<Token>& tokens) {
 	
-	Parser parse;
+	Parse_Context parse;
 	parse.focusTokens(tokens);
 
 	Token* p;
@@ -1517,6 +1787,10 @@ Parser::generateSyntaxTree(std::vector<Token>& tokens) {
 			parse.handleCloseBlock();
 		} else if (parse.matchesDeclaration()) {
 			parse.handleDeclaration();
+		} else if (parse.isIdentifier() && p && p->word == ":=") {
+			parse.handleInferredDeclaration();
+		} else if (word == ";") {
+			parse.next();
 		} else {
 			parse.handleStatement();
 		}	

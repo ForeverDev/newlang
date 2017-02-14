@@ -6,11 +6,18 @@ struct Vector {
 	x: int;
 	y: int;
 	z: int;
-	foo: Foo;
+	meme: (int) -> int;
 };
 
-factorial: () -> int {
-	vec: Vector;
-	vec = vec;
+factorial: (n: int) -> int {
+	if (n <= 1) return 1;
+	return n * factorial(n - 1);
 }
 
+main: () -> void {
+
+	thing: Vector;
+
+	thing.meme(5);
+
+}

@@ -102,6 +102,10 @@ Lexer::handleIdentifier() {
 	t.id = buf;
 	t.word = buf;
 	t.line = line;
+	if (t.word == "new") {
+		t.type = TOK_OPERATOR;
+		t.i = 1000; // idk
+	}
 	tokens.push_back(t);
 }
 
@@ -116,6 +120,7 @@ Lexer::handleOperator() {
 		"==",
 		"!=",
 		"+=",
+		":=",
 		"-=",
 		"*=",
 		"/=",
